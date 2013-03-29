@@ -8,7 +8,7 @@ Copyright &copy; Alex Chamberlain 2012. Released under the MIT licence.
 Dependencies
 ------------
 
-*nginx-qrencode* depends upon ```libqrencode``` and ```libgd```. Please install
+*nginx-qrencode* depends upon ```libqrencode``` and ```libpng```. Please install
 these first.
 
 Installation
