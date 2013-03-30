@@ -20,11 +20,11 @@ typedef struct {
 
 /* Location Configuration */
 typedef struct {
-    ngx_uint_t               version;
-    ngx_uint_t               level;
-    ngx_uint_t               size;
-    ngx_uint_t               margin;
-    ngx_str_t                data;
+    ngx_uint_t                version;
+    ngx_uint_t                level;
+    ngx_uint_t                size;
+    ngx_uint_t                margin;
+    ngx_http_complex_value_t* data;
 } ngx_http_qrencode_loc_conf_t;
 
 /**
@@ -89,7 +89,7 @@ static ngx_command_t ngx_http_qrencode_commands[] = {
         NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
         ngx_conf_set_num_slot,
         NGX_HTTP_LOC_CONF_OFFSET,
-        offsetof(ngx_http_qrencode_loc_conf_t, data),
+        offsetof(ngx_http_qrencode_loc_conf_t, version),
         NULL
     },
     {
@@ -119,7 +119,7 @@ static ngx_command_t ngx_http_qrencode_commands[] = {
     {
         ngx_string("qrencode_data"),
         NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
-        ngx_conf_set_str_slot,
+        ngx_http_set_complex_value_slot,
         NGX_HTTP_LOC_CONF_OFFSET,
         offsetof(ngx_http_qrencode_loc_conf_t, data),
         NULL
@@ -165,7 +165,6 @@ static void* ngx_http_qrencode_create_loc_conf(ngx_conf_t* directive) {
     qrencode_conf->level =  NGX_CONF_UNSET_UINT;
     qrencode_conf->size =  NGX_CONF_UNSET_UINT;
     qrencode_conf->margin =  NGX_CONF_UNSET_UINT;
-    qrencode_conf->data.data = NULL;
     
     return qrencode_conf;
 }
@@ -178,7 +177,9 @@ static char* ngx_http_qrencode_merge_loc_conf(ngx_conf_t* cf, void* void_parent,
     ngx_conf_merge_uint_value(conf->level, prev->level, QR_ECLEVEL_H);
     ngx_conf_merge_uint_value(conf->size, prev->size, 3);
     ngx_conf_merge_uint_value(conf->margin, prev->margin, 0);
-    ngx_conf_merge_str_value(conf->data, prev->data, "");
+    if(conf->data == NULL){
+        conf->data = prev->data;
+    }
 
     return NGX_CONF_OK;
 }
@@ -301,10 +302,16 @@ static ngx_int_t qrcode_draw(qrcode_png_data* data, QRcode *qrcode, int margin, 
 static ngx_int_t ngx_http_qrencode_handler(ngx_http_request_t* request) {
     ngx_http_qrencode_loc_conf_t* qrencode_conf = ngx_http_get_module_loc_conf(request, ngx_http_qrencode_module);
 
+    ngx_str_t qrencode_data;
+    if(NGX_OK != ngx_http_complex_value(request, qrencode_conf->data, &qrencode_data)){
+        ngx_log_error(NGX_LOG_ERR, request->connection->log, 0, "Failed retrieve qrencode_data config value");
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+    
     char* data;
-    if(qrencode_conf->data.len > 0){
-        data = ngx_pcalloc(request->pool, qrencode_conf->data.len + 1);
-        memcpy(data, qrencode_conf->data.data, qrencode_conf->data.len);
+    if(qrencode_data.data && qrencode_data.len > 0){
+        data = ngx_pcalloc(request->pool, qrencode_data.len + 1);
+        memcpy(data, qrencode_data.data, qrencode_data.len);
     }else if(request->headers_in.referer){
         data = ngx_pcalloc(request->pool, request->headers_in.referer->value.len + 1);        
         memcpy(data, request->headers_in.referer->value.data, request->headers_in.referer->value.len);
